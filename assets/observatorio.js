@@ -15,6 +15,8 @@
     const FILES = [
       'data/processed/empleo_base_estandarizada.csv.gz',
       'data/processed/resumen_ocupacion_anio.csv.gz',
+      'data/processed/mercado_laboral_periodo.csv.gz',
+      'data/processed/mercado_laboral_mes.csv.gz',
       'data/processed/ocupacion_crosswalk_4d.csv',
       'data/processed/disponibilidad_fuentes.csv',
       'notebooks/01_workflow_bases_empleo.ipynb'
@@ -43,7 +45,15 @@
     };
 
     const PANORAMA_METRIC_FORMATTERS = {
-      weighted_population: value => numberFormat(value, 0),
+      pet_population: value => numberFormat(value, 0),
+      pea_population: value => numberFormat(value, 0),
+      occupied_population: value => numberFormat(value, 0),
+      unemployed_open_population: value => numberFormat(value, 0),
+      hidden_unemployment_population: value => numberFormat(value, 0),
+      inactive_population: value => numberFormat(value, 0),
+      activity_rate_pet: value => percentFormat(value),
+      employment_rate_pet: value => percentFormat(value),
+      unemployment_rate_pea: value => percentFormat(value),
       income_monthly_weighted_mean: value => currencyFormat(value),
       hours_week_weighted_mean: value => numberFormat(value, 1),
       occupation_count: value => numberFormat(value, 0)
@@ -92,6 +102,22 @@
       const diff = current - previous;
       const sign = diff > 0 ? '+' : '';
       return `${sign}${numberFormat(diff, 1)}`;
+    }
+
+    function panoramaMetricDelta(metric, current, previous) {
+      if (current == null || previous == null || Number.isNaN(current) || Number.isNaN(previous)) return 'Sin comparación';
+      const diff = current - previous;
+      const sign = diff > 0 ? '+' : '';
+      if (['activity_rate_pet', 'employment_rate_pet', 'unemployment_rate_pea'].includes(metric)) {
+        return `${sign}${numberFormat(diff * 100, 1)} pp`;
+      }
+      if (metric === 'income_monthly_weighted_mean') {
+        return `${diff < 0 ? '-' : sign}S/ ${numberFormat(Math.abs(diff), 0)}`;
+      }
+      if (metric === 'hours_week_weighted_mean') {
+        return `${sign}${numberFormat(diff, 1)}`;
+      }
+      return `${sign}${numberFormat(diff, 0)}`;
     }
 
     function unique(values) {
@@ -146,6 +172,52 @@
         return `${row.year} ${extractPeriodCore(row.period_label)}`;
       }
       return String(row.year);
+    }
+
+    function periodEndMonth(periodLabel) {
+      return PERIOD_END_MONTHS[extractPeriodCore(periodLabel)] || 0;
+    }
+
+    function isLimaMovilSource(sourceValue) {
+      return sourceValue === 'EPEN|lima_movil';
+    }
+
+    function panoramaSourceRows(sourceValue) {
+      return DATA.market_period_overview.filter(row => sourceKey(row) === sourceValue);
+    }
+
+    function panoramaYearRows(sourceValue, yearValue) {
+      return panoramaSourceRows(sourceValue)
+        .filter(row => Number(row.year) === Number(yearValue))
+        .sort((a, b) => periodEndMonth(a.period_label) - periodEndMonth(b.period_label));
+    }
+
+    function panoramaCurrentRow(sourceValue, yearValue) {
+      const rows = panoramaYearRows(sourceValue, yearValue);
+      return rows.length ? rows[rows.length - 1] : null;
+    }
+
+    function panoramaPreviousRow(sourceValue, currentRow) {
+      if (!currentRow) return null;
+      if (isLimaMovilSource(sourceValue)) {
+        const core = extractPeriodCore(currentRow.period_label);
+        return panoramaSourceRows(sourceValue).find(row =>
+          Number(row.year) === Number(currentRow.year) - 1 &&
+          extractPeriodCore(row.period_label) === core
+        ) || null;
+      }
+      return panoramaSourceRows(sourceValue).find(row => Number(row.year) === Number(currentRow.year) - 1) || null;
+    }
+
+    function panoramaHistoricalSeries(sourceValue, currentRow) {
+      const rows = panoramaSourceRows(sourceValue);
+      if (isLimaMovilSource(sourceValue) && currentRow) {
+        const core = extractPeriodCore(currentRow.period_label);
+        return rows
+          .filter(row => extractPeriodCore(row.period_label) === core)
+          .sort((a, b) => Number(a.year) - Number(b.year));
+      }
+      return rows.sort((a, b) => Number(a.year) - Number(b.year));
     }
 
     function formatMetricValue(metric, value) {
@@ -259,7 +331,7 @@
     }
 
     function buildSourceSelect(selectEl, includeAll = false) {
-      const options = unique(DATA.yearly_overview.map(row => sourceKey(row)));
+      const options = unique(DATA.market_period_overview.map(row => sourceKey(row)));
       selectEl.innerHTML = [
         includeAll ? `<option value="ALL">Todas las fuentes</option>` : '',
         ...options.map(key => {
@@ -270,7 +342,7 @@
     }
 
     function buildYearSelect(selectEl, sourceValue) {
-      const rows = DATA.yearly_overview.filter(row => sourceValue === 'ALL' || sourceKey(row) === sourceValue);
+      const rows = DATA.market_period_overview.filter(row => sourceValue === 'ALL' || sourceKey(row) === sourceValue);
       const years = unique(rows.map(row => row.year)).sort((a, b) => a - b);
       selectEl.innerHTML = years.map(year => `<option value="${year}">${year}</option>`).join('');
       if (years.length) selectEl.value = String(years[years.length - 1]);
@@ -300,20 +372,35 @@
 
     function renderPanorama() {
       const state = panoramaState();
-      const yearly = DATA.yearly_overview.filter(row => sourceKey(row) === state.sourceValue);
-      const current = yearly.find(row => row.year === state.yearValue);
-      const previous = yearly.find(row => row.year === state.yearValue - 1);
+      const current = panoramaCurrentRow(state.sourceValue, state.yearValue);
+      const previous = panoramaPreviousRow(state.sourceValue, current);
       if (!current) return;
 
       const cards = [
-        { kicker: 'Población ocupada observada', value: numberFormat(current.weighted_population, 0), delta: `100% del empleo ocupado observado · vs. año previo: ${yearDelta(current.weighted_population, previous?.weighted_population)}` },
-        { kicker: 'Ingreso mensual medio', value: currencyFormat(current.income_monthly_weighted_mean), delta: `vs. año previo: ${yearDelta(current.income_monthly_weighted_mean, previous?.income_monthly_weighted_mean)}` },
-        { kicker: 'N ocupaciones observadas', value: numberFormat(current.occupation_count, 0), delta: `vs. año previo: ${yearDelta(current.occupation_count, previous?.occupation_count)}` },
-        { kicker: 'Horas semanales medias', value: numberFormat(current.hours_week_weighted_mean, 1), delta: `Mujeres: ${percentFormat(current.women_share_weighted)} · Rural: ${percentFormat(current.rural_share_weighted)}` }
+        {
+          kicker: 'Población ocupada',
+          value: numberFormat(current.occupied_population, 0),
+          delta: `${percentFormat(current.employment_rate_pet)} de la PET · PEA: ${numberFormat(current.pea_population, 0)} · vs. año previo: ${panoramaMetricDelta('occupied_population', current.occupied_population, previous?.occupied_population)}`
+        },
+        {
+          kicker: 'Tasa de desempleo abierto',
+          value: percentFormat(current.unemployment_rate_pea),
+          delta: `Desocupados abiertos: ${numberFormat(current.unemployed_open_population, 0)} · vs. año previo: ${panoramaMetricDelta('unemployment_rate_pea', current.unemployment_rate_pea, previous?.unemployment_rate_pea)}`
+        },
+        {
+          kicker: 'Tasa de actividad',
+          value: percentFormat(current.activity_rate_pet),
+          delta: `PET: ${numberFormat(current.pet_population, 0)} · Ocupaciones observadas: ${numberFormat(current.occupation_count, 0)}`
+        },
+        {
+          kicker: 'Ingreso mensual medio',
+          value: currencyFormat(current.income_monthly_weighted_mean),
+          delta: `Horas: ${numberFormat(current.hours_week_weighted_mean, 1)} · Mujeres: ${percentFormat(current.women_share_weighted)} · Rural: ${percentFormat(current.rural_share_weighted)}`
+        }
       ];
       document.getElementById('panorama-cards').innerHTML = cards.map(card => `<article class="card"><div class="kicker">${card.kicker}</div><div class="value">${card.value}</div><div class="delta">${card.delta}</div></article>`).join('');
 
-      const yearlySorted = sortBy(yearly, 'year');
+      const yearlySorted = panoramaHistoricalSeries(state.sourceValue, current);
       document.getElementById('panorama-line').innerHTML = svgLineChart({
         points: yearlySorted,
         xField: 'year',
@@ -323,23 +410,58 @@
         xFormatter: value => String(value),
         minZero: true
       });
-      document.getElementById('panorama-line-note').textContent = `${SOURCE_LABELS[state.sourceValue]} · ${document.getElementById('panorama-metric').selectedOptions[0].textContent}`;
+      document.getElementById('panorama-line-note').textContent = isLimaMovilSource(state.sourceValue)
+        ? `${SOURCE_LABELS[state.sourceValue]} · serie anual alineada al corte ${current.period_label} · ${document.getElementById('panorama-metric').selectedOptions[0].textContent}`
+        : `${SOURCE_LABELS[state.sourceValue]} · ${document.getElementById('panorama-metric').selectedOptions[0].textContent}`;
 
-      const monthly = sortBy(DATA.monthly_overview.filter(row => sourceKey(row) === state.sourceValue && row.year === state.yearValue), 'month');
-      document.getElementById('panorama-month').innerHTML = svgLineChart({
-        points: monthly,
-        xField: 'month',
-        yField: state.monthMetric,
-        color: '#b45309',
-        formatter: PANORAMA_METRIC_FORMATTERS[state.monthMetric],
-        xFormatter: value => `M${value}`,
-        minZero: true
-      });
-      document.getElementById('panorama-month-note').textContent = monthly.length
-        ? `Serie mensual de ${document.getElementById('panorama-month-metric').selectedOptions[0].textContent.toLowerCase()} observada en el año seleccionado.`
-        : 'No hay suficiente detalle mensual en esta fuente para el año elegido.';
+      if (isLimaMovilSource(state.sourceValue)) {
+        const intraRows = panoramaYearRows(state.sourceValue, state.yearValue).map(row => ({
+          ...row,
+          chart_order: periodEndMonth(row.period_label),
+          chart_label: extractPeriodCore(row.period_label)
+        }));
+        document.getElementById('panorama-month').innerHTML = svgLineChart({
+          points: intraRows,
+          xField: 'chart_order',
+          yField: state.monthMetric,
+          color: '#b45309',
+          formatter: PANORAMA_METRIC_FORMATTERS[state.monthMetric],
+          xLabelField: 'chart_label',
+          minZero: true,
+          labelRotation: -45,
+          tickEvery: 1
+        });
+        document.getElementById('panorama-month-note').textContent = intraRows.length
+          ? `Serie por trimestre móvil de ${document.getElementById('panorama-month-metric').selectedOptions[0].textContent.toLowerCase()} dentro de ${state.yearValue}.`
+          : 'No hay suficiente detalle intraanual en esta fuente para el año elegido.';
+      } else {
+        const monthly = sortBy(
+          DATA.market_month_overview.filter(row => sourceKey(row) === state.sourceValue && Number(row.year) === state.yearValue),
+          'month'
+        );
+        document.getElementById('panorama-month').innerHTML = svgLineChart({
+          points: monthly,
+          xField: 'month',
+          yField: state.monthMetric,
+          color: '#b45309',
+          formatter: PANORAMA_METRIC_FORMATTERS[state.monthMetric],
+          xFormatter: value => `M${value}`,
+          minZero: true
+        });
+        document.getElementById('panorama-month-note').textContent = monthly.length
+          ? `Serie mensual de ${document.getElementById('panorama-month-metric').selectedOptions[0].textContent.toLowerCase()} observada en el año seleccionado.`
+          : 'No hay suficiente detalle mensual en esta fuente para el año elegido.';
+      }
 
-      const topRows = sortBy(DATA.summary.filter(row => sourceKey(row) === state.sourceValue && row.year === state.yearValue), 'population', true).slice(0, 10);
+      const topRows = sortBy(
+        DATA.summary.filter(row =>
+          sourceKey(row) === state.sourceValue &&
+          Number(row.year) === state.yearValue &&
+          row.period_label === current.period_label
+        ),
+        'population',
+        true
+      ).slice(0, 10);
       document.getElementById('top-occupations-chart').innerHTML = svgBarChart({
         items: topRows,
         labelField: 'name',
@@ -392,7 +514,8 @@
     function renderOccupation(code) {
       const sourceValue = document.getElementById('occupation-source').value;
       const metric = document.getElementById('occupation-metric').value;
-      const rows = sortBy(DATA.summary.filter(row => row.code === code && (sourceValue === 'ALL' || sourceKey(row) === sourceValue)), 'year');
+      const rows = [...DATA.summary.filter(row => row.code === code && (sourceValue === 'ALL' || sourceKey(row) === sourceValue))]
+        .sort((a, b) => seriesSortValue(a) - seriesSortValue(b));
       const meta = DATA.lookup.find(row => row.code === code);
       const content = document.getElementById('occupation-content');
       if (!rows.length) {
@@ -400,7 +523,7 @@
         return;
       }
 
-      const latest = sortBy(rows, 'year', true)[0];
+      const latest = [...rows].sort((a, b) => seriesSortValue(b) - seriesSortValue(a))[0];
       const chips = [
         `<span class="pill">Código CNO: ${code}</span>`,
         meta?.ciuo_names ? `<span class="pill">CIUO: ${meta.ciuo_names}</span>` : '',
@@ -707,7 +830,17 @@
 
       document.getElementById('export-panorama-csv').addEventListener('click', () => {
         const state = panoramaState();
-        const rows = sortBy(DATA.summary.filter(row => sourceKey(row) === state.sourceValue && row.year === state.yearValue), 'population', true);
+        const current = panoramaCurrentRow(state.sourceValue, state.yearValue);
+        if (!current) return;
+        const rows = sortBy(
+          DATA.summary.filter(row =>
+            sourceKey(row) === state.sourceValue &&
+            Number(row.year) === state.yearValue &&
+            row.period_label === current.period_label
+          ),
+          'population',
+          true
+        );
         downloadText(`panorama_${state.sourceValue.replace('|', '_')}_${state.yearValue}.csv`, recordsToCSV(rows), 'text/csv;charset=utf-8');
       });
       document.getElementById('print-panorama').addEventListener('click', () => window.print());

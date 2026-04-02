@@ -24,8 +24,9 @@
         <button data-tab="metodologia">Metodología</button>
       </div>
       <div class="notice">
-        En esta versión, el panorama resume <strong>empleo ocupado con código ocupacional</strong>.
-        Los porcentajes mostrados para ocupaciones son <strong>participación dentro del total ocupado observado</strong>, no tasa de empleo/desempleo.
+        El panorama ya usa una capa de <strong>mercado laboral</strong> basada en condición de actividad
+        (PET, PEA, ocupados y desocupados abiertos). Las fichas por ocupación siguen mostrando
+        <strong>participación dentro del total ocupado observado con código ocupacional válido</strong>.
       </div>
     </section>
 
@@ -33,7 +34,7 @@
       <div class="section-head">
         <div>
           <h2>Panorama</h2>
-          <p class="sub">Visión general del mercado ocupacional observado para un año y una fuente seleccionada.</p>
+          <p class="sub">Visión general del mercado laboral y del universo ocupacional procesado para un año y una fuente seleccionada.</p>
         </div>
       </div>
       <div class="filters">
@@ -48,16 +49,22 @@
         <div class="field">
           <label for="panorama-metric">Indicador histórico</label>
           <select id="panorama-metric">
-            <option value="weighted_population">Población ocupada</option>
+            <option value="occupied_population">Población ocupada</option>
+            <option value="employment_rate_pet">Tasa de empleo sobre PET</option>
+            <option value="unemployment_rate_pea">Tasa de desempleo abierto sobre PEA</option>
+            <option value="activity_rate_pet">Tasa de actividad sobre PET</option>
             <option value="income_monthly_weighted_mean">Ingreso mensual medio</option>
             <option value="hours_week_weighted_mean">Horas semanales medias</option>
             <option value="occupation_count">N ocupaciones observadas</option>
           </select>
         </div>
         <div class="field">
-          <label for="panorama-month-metric">Indicador mensual</label>
+          <label for="panorama-month-metric">Indicador intraanual</label>
           <select id="panorama-month-metric">
-            <option value="weighted_population">Población ocupada</option>
+            <option value="occupied_population">Población ocupada</option>
+            <option value="employment_rate_pet">Tasa de empleo sobre PET</option>
+            <option value="unemployment_rate_pea">Tasa de desempleo abierto sobre PEA</option>
+            <option value="activity_rate_pet">Tasa de actividad sobre PET</option>
             <option value="income_monthly_weighted_mean">Ingreso mensual medio</option>
             <option value="hours_week_weighted_mean">Horas semanales medias</option>
           </select>
@@ -78,8 +85,8 @@
           <div class="chart-note" id="panorama-line-note"></div>
         </div>
         <div class="card">
-          <h3>Detalle mensual del año</h3>
-          <p class="sub">Agregado mensual disponible para la fuente y el año actual.</p>
+          <h3>Detalle intraanual</h3>
+          <p class="sub">Mensual para fuentes anuales y por trimestre móvil para EPEN Lima.</p>
           <div class="chart-wrap" id="panorama-month"></div>
           <div class="chart-note" id="panorama-month-note"></div>
         </div>
@@ -254,8 +261,9 @@
         <div class="meta-item">
           <h3>Limitaciones actuales</h3>
           <p class="sub">
-            Esta versión resume población ocupada con código CNO válido. Sirve para explorar ocupaciones,
-            ingresos, horas, composición por sexo y ruralidad. No debe leerse como tasa de empleo/desempleo.
+            Las fichas ocupacionales siguen dependiendo de la ocupación actual declarada y de un código CNO válido.
+            Por eso sirven para explorar ocupaciones, ingresos, horas y composición, pero no para medir desempleo
+            “de economistas” o “de abogados” sin construir antes una capa adicional por última ocupación o formación.
           </p>
         </div>
       </div>
