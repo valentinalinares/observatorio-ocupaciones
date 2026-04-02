@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Observatorio ENAHO · EPEN</title>
+  <meta name="description" content="Observatorio de empleo y ocupaciones en Perú con ENAHO y EPEN." />
+  <link rel="stylesheet" href="./assets/observatorio.css" />
+</head>
+<body>
+  <div class="shell">
+    <section class="hero">
+      <div class="brand"><small>ENAHO · EPEN</small></div>
+      <h1>Observatorio de Empleo y Ocupaciones en Perú</h1>
+      <p class="lede">
+        Esta versión está pensada para publicación estática. La página usa agregados y series ya procesadas,
+        no las bases crudas completas, para que el explorador sea rápido, compartible y apto para GitHub Pages.
+      </p>
+      <div class="nav-tabs">
+        <button class="active" data-tab="panorama">Panorama</button>
+        <button data-tab="ocupaciones">Ocupaciones</button>
+        <button data-tab="cambios">Cambios</button>
+        <button data-tab="fuentes">Por fuente</button>
+        <button data-tab="metodologia">Metodología</button>
+      </div>
+      <div class="notice">
+        En esta versión, el panorama resume <strong>empleo ocupado con código ocupacional</strong>.
+        Los porcentajes mostrados para ocupaciones son <strong>participación dentro del total ocupado observado</strong>, no tasa de empleo/desempleo.
+      </div>
+    </section>
+
+    <section id="tab-panorama" class="panel active">
+      <div class="section-head">
+        <div>
+          <h2>Panorama</h2>
+          <p class="sub">Visión general del mercado ocupacional observado para un año y una fuente seleccionada.</p>
+        </div>
+      </div>
+      <div class="filters">
+        <div class="field">
+          <label for="panorama-source">Fuente</label>
+          <select id="panorama-source"></select>
+        </div>
+        <div class="field">
+          <label for="panorama-year">Año</label>
+          <select id="panorama-year"></select>
+        </div>
+        <div class="field">
+          <label for="panorama-metric">Indicador histórico</label>
+          <select id="panorama-metric">
+            <option value="weighted_population">Población ocupada</option>
+            <option value="income_monthly_weighted_mean">Ingreso mensual medio</option>
+            <option value="hours_week_weighted_mean">Horas semanales medias</option>
+            <option value="occupation_count">N ocupaciones observadas</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="panorama-month-metric">Indicador mensual</label>
+          <select id="panorama-month-metric">
+            <option value="weighted_population">Población ocupada</option>
+            <option value="income_monthly_weighted_mean">Ingreso mensual medio</option>
+            <option value="hours_week_weighted_mean">Horas semanales medias</option>
+          </select>
+        </div>
+        <div class="actions">
+          <button class="btn soft" id="export-panorama-csv">Exportar tabla</button>
+          <button class="btn alt" id="print-panorama">Imprimir</button>
+        </div>
+      </div>
+
+      <div class="grid-cards" id="panorama-cards"></div>
+
+      <div class="layout-two">
+        <div class="card">
+          <h3>Evolución anual</h3>
+          <p class="sub">Serie histórica del indicador seleccionado para la fuente elegida.</p>
+          <div class="chart-wrap" id="panorama-line"></div>
+          <div class="chart-note" id="panorama-line-note"></div>
+        </div>
+        <div class="card">
+          <h3>Detalle mensual del año</h3>
+          <p class="sub">Agregado mensual disponible para la fuente y el año actual.</p>
+          <div class="chart-wrap" id="panorama-month"></div>
+          <div class="chart-note" id="panorama-month-note"></div>
+        </div>
+      </div>
+
+      <div class="layout-full">
+        <div class="card">
+          <div class="section-head inline">
+            <div>
+              <h3>Ocupaciones principales</h3>
+              <p class="sub">Ranking de ocupaciones por población ocupada estimada.</p>
+            </div>
+          </div>
+          <div class="chart-wrap" id="top-occupations-chart"></div>
+        </div>
+        <div class="card">
+          <div class="section-head inline">
+            <div>
+              <h3>Tabla del año</h3>
+              <p class="sub">Puedes exportar esta vista para usarla como reporte base.</p>
+            </div>
+          </div>
+          <div class="table-wrap"><table id="panorama-table"></table></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-ocupaciones" class="panel">
+      <div class="section-head">
+        <div>
+          <h2>Ocupaciones</h2>
+          <p class="sub">Busca por nombre o código CNO y obtén una ficha ocupacional reutilizable para contraste analítico.</p>
+        </div>
+      </div>
+      <div class="filters">
+        <div class="field field-grow">
+          <label for="occupation-search">Buscador</label>
+          <input id="occupation-search" type="text" placeholder="Escribe nombre o código CNO..." list="occupation-options" />
+          <datalist id="occupation-options"></datalist>
+        </div>
+        <div class="field">
+          <label for="occupation-source">Fuente</label>
+          <select id="occupation-source"></select>
+        </div>
+        <div class="field">
+          <label for="occupation-metric">Indicador a graficar</label>
+          <select id="occupation-metric">
+            <option value="population">Población ocupada</option>
+            <option value="income_mean">Ingreso medio</option>
+            <option value="income_median">Ingreso mediano</option>
+            <option value="hours_mean">Horas semanales</option>
+            <option value="women_share">% mujeres</option>
+            <option value="rural_share">% rural</option>
+            <option value="age_mean">Edad media</option>
+            <option value="cases">Casos muestrales</option>
+          </select>
+        </div>
+        <div class="actions">
+          <button class="btn primary" id="run-occupation-search">Buscar</button>
+          <button class="btn soft" id="export-occupation-csv">Exportar serie</button>
+          <button class="btn alt" id="print-occupation">Imprimir ficha</button>
+        </div>
+      </div>
+      <div id="occupation-results" class="search-results"></div>
+      <div id="occupation-content" class="occupation-content"></div>
+    </section>
+
+    <section id="tab-cambios" class="panel">
+      <div class="section-head">
+        <div>
+          <h2>Cambios</h2>
+          <p class="sub">Comparación de ocupaciones que más aumentan o disminuyen entre años, separada por fuente.</p>
+        </div>
+      </div>
+      <div class="filters">
+        <div class="field">
+          <label for="changes-source">Fuente</label>
+          <select id="changes-source"></select>
+        </div>
+        <div class="field">
+          <label for="changes-metric">Indicador</label>
+          <select id="changes-metric">
+            <option value="population">Población ocupada</option>
+            <option value="income_mean">Ingreso medio</option>
+            <option value="hours_mean">Horas semanales</option>
+            <option value="women_share">% mujeres</option>
+            <option value="rural_share">% rural</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="changes-start-year">Año inicial</label>
+          <select id="changes-start-year"></select>
+        </div>
+        <div class="field">
+          <label for="changes-end-year">Año final</label>
+          <select id="changes-end-year"></select>
+        </div>
+        <div class="actions">
+          <button class="btn soft" id="export-changes-csv">Exportar cambios</button>
+          <button class="btn alt" id="print-changes">Imprimir</button>
+        </div>
+      </div>
+
+      <div class="grid-cards" id="changes-cards"></div>
+
+      <div class="layout-two">
+        <div class="card">
+          <h3>Ocupaciones que más aumentan</h3>
+          <p class="sub">Top variaciones positivas en el periodo seleccionado.</p>
+          <div class="chart-wrap" id="changes-up-chart"></div>
+        </div>
+        <div class="card">
+          <h3>Ocupaciones que más disminuyen</h3>
+          <p class="sub">Top variaciones negativas en el periodo seleccionado.</p>
+          <div class="chart-wrap" id="changes-down-chart"></div>
+        </div>
+      </div>
+
+      <div class="layout-full">
+        <div class="card">
+          <h3>Tabla comparativa</h3>
+          <p class="sub">Vista base para revisar código, valor inicial, valor final y cambio total.</p>
+          <div class="table-wrap"><table id="changes-table"></table></div>
+        </div>
+        <div class="card">
+          <h3>Cambio rural / urbano</h3>
+          <p class="sub">Disponible cuando la fuente reporta ruralidad. La columna urbana es el complemento de la rural.</p>
+          <div class="chart-note" id="changes-rural-note"></div>
+          <div class="table-wrap"><table id="changes-rural-table"></table></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-fuentes" class="panel">
+      <div class="section-head">
+        <div>
+          <h2>Por fuente</h2>
+          <p class="sub">Resumen de cobertura, periodicidad y disponibilidad de cada fuente ya procesada.</p>
+        </div>
+      </div>
+      <div id="source-cards" class="source-grid"></div>
+      <div class="card">
+        <h3>Disponibilidad por periodo</h3>
+        <p class="sub">Inventario útil para saber qué años y periodos puedes comparar sin abrir archivos manualmente.</p>
+        <div class="table-wrap"><table id="availability-table"></table></div>
+      </div>
+    </section>
+
+    <section id="tab-metodologia" class="panel">
+      <div class="section-head">
+        <div>
+          <h2>Metodología</h2>
+          <p class="sub">Resumen operativo de cómo está construida esta versión del observatorio.</p>
+        </div>
+      </div>
+      <div class="meta-list">
+        <div class="meta-item">
+          <h3>Qué carga esta página</h3>
+          <p class="sub">
+            La página usa resúmenes ya procesados, no las bases crudas completas.
+            Eso evita un sitio innecesariamente pesado y permite publicarlo como activo estático.
+          </p>
+        </div>
+        <div class="meta-item">
+          <h3>Fuentes incluidas</h3>
+          <div id="source-pills"></div>
+        </div>
+        <div class="meta-item">
+          <h3>Archivos base del workflow</h3>
+          <div id="file-pills"></div>
+        </div>
+        <div class="meta-item">
+          <h3>Limitaciones actuales</h3>
+          <p class="sub">
+            Esta versión resume población ocupada con código CNO válido. Sirve para explorar ocupaciones,
+            ingresos, horas, composición por sexo y ruralidad. No debe leerse como tasa de empleo/desempleo.
+          </p>
+        </div>
+      </div>
+      <p class="footer-note">
+        Generado: <span id="generated-at"></span>.
+      </p>
+    </section>
+  </div>
+
+  <script src="./data/observatorio_data.js"></script>
+  <script src="./assets/observatorio.js"></script>
+</body>
+</html>
